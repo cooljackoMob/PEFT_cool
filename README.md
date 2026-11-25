@@ -36,7 +36,14 @@ fresh head converges slowly enough that early epochs measure head convergence
 instead of rank allocation. The multiple is identical across groups, so it is
 part of the fixed setup, not the variable — but it is worth one calibration
 run on your dataset before launching the matrix, and the realised value is
-recorded in each run's `config.json`.
+recorded in each run's `config.json`:
+
+```bash
+python experiments/calibrate_head_lr.py --mults 1,10,30 \
+  --subset 2000 --val-subset 1000 --epochs 3
+```
+
+Take the smallest multiple whose accuracy has plateaued.
 
 `alpha` defaults to `alpha = rank`, so the adapter scale `alpha/r` stays
 constant across decoupled ranks. Without that, "more rank" silently also means
@@ -47,6 +54,9 @@ constant across decoupled ranks. Without that, "more rank" silently also means
 ```bash
 pip install -r requirements.txt
 python -m pytest tests -q      # 35 tests, CPU, no dataset or weights needed
+
+# `--dataset hf_cifar100` pulls CIFAR-100 from the Hugging Face hub instead of
+# www.cs.toronto.edu, for networks where that host is unreachable.
 
 # 1. confirm the control holds before spending GPU time (no training)
 python train.py --backbone swin_tiny --task classification \

@@ -81,6 +81,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--weight-decay", type=float, default=1e-4)
     p.add_argument("--warmup-epochs", type=int, default=1)
     p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--subset", type=int, default=None,
+                   help="cap training examples (fixed seed) for calibration runs")
+    p.add_argument("--val-subset", type=int, default=None)
     p.add_argument("--amp", action="store_true")
     p.add_argument("--train-norm", action="store_true")
     p.add_argument("--seed", type=int, default=0)
@@ -139,9 +142,14 @@ def main() -> None:
             from drlora.data import classification_loaders as loaders
         else:
             from drlora.data import segmentation_loaders as loaders
+        kw = {}
+        if args.task == "classification":
+            kw = {"subset": args.subset, "val_subset": args.val_subset}
+        elif args.subset or args.val_subset:
+            raise SystemExit("--subset is only wired up for classification")
         train_loader, val_loader, num_classes = loaders(
             args.data_root, dataset, args.img_size, args.batch_size, args.workers,
-            args.seed)
+            args.seed, **kw)
 
     model = build_model(args.task, args.backbone, num_classes,
                         pretrained=not args.no_pretrained, img_size=args.img_size)

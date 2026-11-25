@@ -15,8 +15,14 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 def classification_loaders(root: str, dataset: str = "cifar100", img_size: int = 224,
-                           batch_size: int = 64, workers: int = 8, seed: int = 0
+                           batch_size: int = 64, workers: int = 8, seed: int = 0,
+                           subset: int | None = None, val_subset: int | None = None
                            ) -> Tuple[DataLoader, DataLoader, int]:
+    """Classification loaders.
+
+    `subset`/`val_subset` cap the number of examples (fixed seed), for cheap
+    calibration runs; leave them None for the real experiment.
+    """
     from torchvision import datasets, transforms
     train_tf = transforms.Compose([
         transforms.RandomResizedCrop(img_size, scale=(0.7, 1.0)),
@@ -30,7 +36,30 @@ def classification_loaders(root: str, dataset: str = "cifar100", img_size: int =
         transforms.ToTensor(),
         transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
     ])
-    if dataset == "cifar100":
+    if dataset == "hf_cifar100":
+        # Same data as `cifar100`, fetched from the Hugging Face hub instead of
+        # www.cs.toronto.edu -- useful where that host is unreachable.  Accepts
+        # `subset`/`val_subset` so a calibration run can use a fixed slice.
+        from datasets import load_dataset
+
+        class _HF(Dataset):
+            def __init__(self, split: str, tf, n: int | None):
+                self.ds = load_dataset("uoft-cs/cifar100", split=split)
+                if n:
+                    self.ds = self.ds.shuffle(seed=seed).select(range(min(n, len(self.ds))))
+                self.tf = tf
+
+            def __len__(self):
+                return len(self.ds)
+
+            def __getitem__(self, i):
+                r = self.ds[i]
+                return self.tf(r["img"].convert("RGB")), int(r["fine_label"])
+
+        tr = _HF("train", train_tf, subset)
+        va = _HF("test", eval_tf, val_subset)
+        n_cls = 100
+    elif dataset == "cifar100":
         tr = datasets.CIFAR100(root, train=True, download=True, transform=train_tf)
         va = datasets.CIFAR100(root, train=False, download=True, transform=eval_tf)
         n_cls = 100

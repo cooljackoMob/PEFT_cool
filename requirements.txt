@@ -8,3 +8,4 @@ pandas
 pytest
 torch>=2.1
 scipy
+datasets  # only for --dataset hf_cifar100
