@@ -69,13 +69,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--head-lr-mult", type=float, default=10.0,
-                   help="head LR = lr * this. The task head is trained from "
-                        "scratch while the adapters only perturb pretrained "
-                        "weights, so a head on the adapter LR learns too "
-                        "slowly and early accuracy reflects head convergence "
-                        "rather than rank allocation. Held fixed across "
-                        "groups, so it is part of the controlled setup.")
+    p.add_argument("--head-lr-mult", type=float, default=1.0,
+                   help="head LR = lr * this. Measured, not assumed: on "
+                        "Swin-T / CIFAR-100 (2000-image calibration subset, "
+                        "uniform rank 8, 3 epochs) best top-1 was 0.705 at "
+                        "1x, 0.689 at 10x and 0.669 at 30x -- a faster head "
+                        "led at epoch 1 but finished behind with a lower "
+                        "train loss, i.e. fitting the head, not helping the "
+                        "adapters. Re-run experiments/calibrate_head_lr.py on "
+                        "your own dataset and epoch budget before changing "
+                        "it. Held fixed across groups either way, so it is "
+                        "part of the controlled setup.")
     p.add_argument("--head-lr", type=float, default=None,
                    help="absolute head LR; overrides --head-lr-mult")
     p.add_argument("--weight-decay", type=float, default=1e-4)

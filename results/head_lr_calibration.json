@@ -1,0 +1,48 @@
+{
+  "args": {
+    "mults": "1,10,30",
+    "backbone": "swin_tiny",
+    "dataset": "hf_cifar100",
+    "strategy": "uniform",
+    "base_rank": 8,
+    "epochs": 3,
+    "batch_size": 16,
+    "img_size": 224,
+    "lr": 0.001,
+    "subset": 2000,
+    "val_subset": 1000,
+    "seed": 0,
+    "workers": 2,
+    "out": "runs/calib",
+    "extra": ""
+  },
+  "results": {
+    "1.0": {
+      "best_top1": 0.705,
+      "head_lr": 0.001,
+      "per_epoch": [
+        0.548,
+        0.673,
+        0.705
+      ]
+    },
+    "10.0": {
+      "best_top1": 0.689,
+      "head_lr": 0.01,
+      "per_epoch": [
+        0.597,
+        0.667,
+        0.689
+      ]
+    },
+    "30.0": {
+      "best_top1": 0.669,
+      "head_lr": 0.03,
+      "per_epoch": [
+        0.546,
+        0.647,
+        0.669
+      ]
+    }
+  }
+}

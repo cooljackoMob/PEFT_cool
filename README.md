@@ -29,12 +29,24 @@ number.
 `random_control` is a budget-matched nonsense allocation: if tuned strategies
 do not beat it, the ranking signal is noise, not insight.
 
-The task head trains from scratch while the adapters only perturb pretrained
-weights, so the head runs at `10x` the adapter LR by default
-(`--head-lr-mult`, or `--head-lr` for an absolute value). On the adapter LR a
-fresh head converges slowly enough that early epochs measure head convergence
-instead of rank allocation. The multiple is identical across groups, so it is
-part of the fixed setup, not the variable — but it is worth one calibration
+The task head runs at the **same LR as the adapters** by default
+(`--head-lr-mult 1.0`; `--head-lr` sets an absolute value). A faster head is
+the intuitive choice -- it trains from scratch while the adapters only perturb
+pretrained weights -- but it measured worse here:
+
+| head-LR mult | head LR | ep1 | ep2 | ep3 | best top-1 |
+|---|---|---|---|---|---|
+| **1x** | 1e-3 | 54.8% | 67.3% | **70.5%** | **0.7050** |
+| 10x | 1e-2 | 59.7% | 66.7% | 68.9% | 0.6890 |
+| 30x | 3e-2 | 54.6% | 64.7% | 66.9% | 0.6690 |
+
+Swin-T, pretrained, `uniform` rank 8, 2000 train / 1000 val CIFAR-100, seed 0.
+The 10x head led at epoch 1 and finished 1.6pp behind with the lowest train
+loss of the three: it fits the head rather than teaching the adapters. One
+seed on 20 images per class, and all three were still climbing at epoch 3, so
+treat this as early-training behaviour and re-calibrate for your own dataset
+and epoch budget. The multiple is identical across groups, so it is part of
+the fixed setup, not the variable — but it is worth one calibration
 run on your dataset before launching the matrix, and the realised value is
 recorded in each run's `config.json`:
 
