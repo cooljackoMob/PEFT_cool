@@ -34,7 +34,13 @@ def parse_args():
     p.add_argument("--tasks", default="classification,segmentation")
     p.add_argument("--strategies", default=",".join(DEFAULT_STRATEGIES))
     p.add_argument("--seeds", default="0,1,2")
-    p.add_argument("--base-rank", type=int, default=8)
+    p.add_argument("--base-ranks", default="8",
+                   help="comma-separated reference ranks to sweep. The budget "
+                        "is re-derived per rank, so each value is its own "
+                        "self-contained controlled comparison. Sweep downward "
+                        "(e.g. 2,4,8): allocation can only matter where the "
+                        "budget actually binds, and at a generous rank every "
+                        "strategy may tie.")
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--out", default="runs")
     p.add_argument("--dry-run", action="store_true")
@@ -49,13 +55,14 @@ def main():
         [t for t in args.tasks.split(",") if t],
         [s for s in args.strategies.split(",") if s],
         [int(s) for s in args.seeds.split(",") if s],
+        [int(s) for s in args.base_ranks.split(",") if s],
     ))
     print(f"{len(grid)} runs queued")
     failures = []
-    for backbone, task, strategy, seed in grid:
+    for backbone, task, strategy, seed, base_rank in grid:
         cmd = [sys.executable, "train.py", "--backbone", backbone, "--task", task,
                "--strategy", strategy, "--seed", str(seed),
-               "--base-rank", str(args.base_rank), "--epochs", str(args.epochs),
+               "--base-rank", str(base_rank), "--epochs", str(args.epochs),
                "--out", args.out]
         if args.dry_run:
             cmd.append("--dry-run")
@@ -63,7 +70,7 @@ def main():
             cmd += args.extra.split()
         print("$", " ".join(cmd), flush=True)
         if subprocess.run(cmd).returncode != 0:
-            failures.append((backbone, task, strategy, seed))
+            failures.append((backbone, task, strategy, seed, base_rank))
     if failures:
         print("FAILED:", json.dumps(failures))
         sys.exit(1)

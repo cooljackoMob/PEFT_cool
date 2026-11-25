@@ -49,7 +49,8 @@ python train.py --backbone swin_tiny --task classification \
 
 # 3. the full matrix: backbones x tasks x strategies x seeds
 python experiments/run_matrix.py --dry-run      # inspect budgets first
-python experiments/run_matrix.py --epochs 20 --seeds 0,1,2 --extra "--amp"
+python experiments/run_matrix.py --epochs 20 --seeds 0,1,2 \
+  --base-ranks 2,4,8 --extra "--amp"   # one controlled cell per rank
 
 # 4. aggregate: mean +/- std, delta vs uniform, paired t-test, budget check
 python experiments/analyze.py --out runs --csv results.csv
@@ -83,8 +84,12 @@ python experiments/probe_sensitivity.py --probe grad --out runs/sens.json
 - A win for `qkv_only` would be stronger still, but confounds *allocation* with
   *site coverage* — report it separately from the graded variants.
 - If every strategy lands within the seed spread, the honest conclusion is that
-  allocation does not matter at this budget; re-run at a smaller `--base-rank`,
-  where the budget actually binds, before concluding anything.
+  allocation does not matter at this budget. Sweep downward
+  (`--base-ranks 2,4,8`) before concluding anything: at a generous rank every
+  strategy has enough capacity everywhere, so a tie there says nothing about
+  where rank should go when it is scarce. Each rank is its own self-contained
+  comparison with its own re-derived budget, and `analyze.py` groups by
+  `base_rank` accordingly.
 
 ## Layout
 
