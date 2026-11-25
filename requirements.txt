@@ -4,3 +4,7 @@ timm>=0.9.12
 numpy
 pyyaml
 pandas
+
+pytest
+torch>=2.1
+scipy

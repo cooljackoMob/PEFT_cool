@@ -37,6 +37,7 @@ constant across decoupled ranks. Without that, "more rank" silently also means
 
 ```bash
 pip install -r requirements.txt
+python -m pytest tests -q      # 35 tests, CPU, no dataset or weights needed
 
 # 1. confirm the control holds before spending GPU time (no training)
 python train.py --backbone swin_tiny --task classification \
@@ -93,5 +94,5 @@ drlora/lora.py     per-site-rank LoRALinear, injection, freezing, counting
 drlora/models.py   fixed backbones, site discovery/grouping, cls + dense heads
 drlora/data.py     fixed loaders   drlora/metrics.py  top-1, mIoU
 train.py           one experimental group     experiments/  matrix, probe, analysis
-tests/             budget-control guarantees (run with pytest, no GPU needed)
+tests/             budget-control + forward/backward guarantees (pytest, CPU)
 ```

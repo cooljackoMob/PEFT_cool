@@ -121,12 +121,19 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     dataset = args.dataset or ("cifar100" if args.task == "classification" else "voc")
-    if args.task == "classification":
-        from drlora.data import classification_loaders as loaders
+    if args.dry_run:
+        # allocation and the budget assertion do not depend on the data, so
+        # skip the download: a dry run must be cheap enough to be habitual.
+        train_loader = val_loader = None
+        num_classes = 100 if args.task == "classification" else 21
     else:
-        from drlora.data import segmentation_loaders as loaders
-    train_loader, val_loader, num_classes = loaders(
-        args.data_root, dataset, args.img_size, args.batch_size, args.workers, args.seed)
+        if args.task == "classification":
+            from drlora.data import classification_loaders as loaders
+        else:
+            from drlora.data import segmentation_loaders as loaders
+        train_loader, val_loader, num_classes = loaders(
+            args.data_root, dataset, args.img_size, args.batch_size, args.workers,
+            args.seed)
 
     model = build_model(args.task, args.backbone, num_classes,
                         pretrained=not args.no_pretrained, img_size=args.img_size)
@@ -184,7 +191,7 @@ def main() -> None:
         0.5 * (1 + np.cos(np.pi * (s - warmup) / max(total_steps - warmup, 1))))
     ignore = 255 if args.task == "segmentation" else -100
     criterion = nn.CrossEntropyLoss(ignore_index=ignore)
-    scaler = torch.cuda.amp.GradScaler(enabled=args.amp and device == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device == "cuda")
 
     history = []
     best = -1.0
