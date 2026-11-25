@@ -12,7 +12,7 @@ repo isolates the second one.
 
 | role | setting |
 |---|---|
-| fixed | backbone (`swin_tiny` or `vit_b16`, pretrained), task + dataset + splits, augmentation, optimizer, schedule, epochs, seed set, head/decoder architecture |
+| fixed | backbone (`swin_tiny` or `vit_b16`, pretrained), task + dataset + splits, augmentation, optimizer, schedule, epochs, seed set, head/decoder architecture, head LR multiple |
 | **independent variable** | rank allocation across groups `qkv / proj / fc1 / fc2` and across depth |
 | controlled | total trainable LoRA parameters (default) or total rank (`--budget-mode rank`), matched to the uniform reference within 0.5% |
 | tasks | classification (top-1) **and** dense prediction (mIoU), to test task generality |
@@ -28,6 +28,15 @@ number.
 
 `random_control` is a budget-matched nonsense allocation: if tuned strategies
 do not beat it, the ranking signal is noise, not insight.
+
+The task head trains from scratch while the adapters only perturb pretrained
+weights, so the head runs at `10x` the adapter LR by default
+(`--head-lr-mult`, or `--head-lr` for an absolute value). On the adapter LR a
+fresh head converges slowly enough that early epochs measure head convergence
+instead of rank allocation. The multiple is identical across groups, so it is
+part of the fixed setup, not the variable — but it is worth one calibration
+run on your dataset before launching the matrix, and the realised value is
+recorded in each run's `config.json`.
 
 `alpha` defaults to `alpha = rank`, so the adapter scale `alpha/r` stays
 constant across decoupled ranks. Without that, "more rank" silently also means

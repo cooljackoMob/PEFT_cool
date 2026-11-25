@@ -69,7 +69,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--head-lr", type=float, default=None)
+    p.add_argument("--head-lr-mult", type=float, default=10.0,
+                   help="head LR = lr * this. The task head is trained from "
+                        "scratch while the adapters only perturb pretrained "
+                        "weights, so a head on the adapter LR learns too "
+                        "slowly and early accuracy reflects head convergence "
+                        "rather than rank allocation. Held fixed across "
+                        "groups, so it is part of the controlled setup.")
+    p.add_argument("--head-lr", type=float, default=None,
+                   help="absolute head LR; overrides --head-lr-mult")
     p.add_argument("--weight-decay", type=float, default=1e-4)
     p.add_argument("--warmup-epochs", type=int, default=1)
     p.add_argument("--workers", type=int, default=8)
@@ -171,6 +179,8 @@ def main() -> None:
         "param_counts": counts, "allocation": alloc.ranks,
         "allocation_by_group": alloc.by_group(), "budget_meta": alloc.meta,
         "reference_params": reference.total_params,
+        "head_lr": (args.head_lr if args.head_lr is not None
+                    else args.lr * args.head_lr_mult),
     }
     (out_dir / "config.json").write_text(json.dumps(record, indent=2, default=str))
     if args.dry_run:
@@ -178,7 +188,10 @@ def main() -> None:
         return
 
     model.to(device)
-    head_lr = args.head_lr if args.head_lr is not None else args.lr
+    head_lr = (args.head_lr if args.head_lr is not None
+               else args.lr * args.head_lr_mult)
+    print(f"lr: lora={args.lr:g} head={head_lr:g} "
+          f"(mult={args.head_lr_mult:g})")
     optim = torch.optim.AdamW([
         {"params": lora_parameters(model), "lr": args.lr},
         {"params": head_parameters(model), "lr": head_lr},
