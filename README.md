@@ -1,0 +1,97 @@
+# Decoupled-Rank LoRA under a Controlled Parameter Budget
+
+Does the MTLoRA finding — that removing the **QKV** low-rank modules hurts most
+(+2.55 → +1.26 accuracy) while removing **proj** hurts less (+1.65) — still
+hold once ranks are *decoupled* per module type instead of being uniform?
+
+That ablation varied *presence* under a uniform-rank assumption, so "QKV
+matters most" and "QKV should get the most rank" are not the same claim. This
+repo isolates the second one.
+
+## Experimental design
+
+| role | setting |
+|---|---|
+| fixed | backbone (`swin_tiny` or `vit_b16`, pretrained), task + dataset + splits, augmentation, optimizer, schedule, epochs, seed set, head/decoder architecture |
+| **independent variable** | rank allocation across groups `qkv / proj / fc1 / fc2` and across depth |
+| controlled | total trainable LoRA parameters (default) or total rank (`--budget-mode rank`), matched to the uniform reference within 0.5% |
+| tasks | classification (top-1) **and** dense prediction (mIoU), to test task generality |
+| measured | best metric, per-seed spread, paired t-test vs uniform, peak memory |
+
+A LoRA pair on a `(out, in)` weight costs `r * (in + out)` parameters, so
+**equal rank is not equal parameters** — a Swin `qkv` site costs 2× a `proj`
+site per unit of rank. The allocator therefore solves for integer ranks by
+water-filling against rank caps plus largest-remainder rounding, and
+`train.py` *asserts* the realised LoRA parameter count against the uniform
+reference before training starts. An unfair run fails rather than reporting a
+number.
+
+`random_control` is a budget-matched nonsense allocation: if tuned strategies
+do not beat it, the ranking signal is noise, not insight.
+
+`alpha` defaults to `alpha = rank`, so the adapter scale `alpha/r` stays
+constant across decoupled ranks. Without that, "more rank" silently also means
+"larger effective learning rate" and the comparison measures the wrong thing.
+
+## Usage
+
+```bash
+pip install -r requirements.txt
+
+# 1. confirm the control holds before spending GPU time (no training)
+python train.py --backbone swin_tiny --task classification \
+  --strategy qkv_heavy --base-rank 8 --dry-run
+
+# 2. one group
+python train.py --backbone swin_tiny --task classification \
+  --strategy qkv_heavy --base-rank 8 --epochs 20 --seed 0 --amp
+
+# 3. the full matrix: backbones x tasks x strategies x seeds
+python experiments/run_matrix.py --dry-run      # inspect budgets first
+python experiments/run_matrix.py --epochs 20 --seeds 0,1,2 --extra "--amp"
+
+# 4. aggregate: mean +/- std, delta vs uniform, paired t-test, budget check
+python experiments/analyze.py --out runs --csv results.csv
+```
+
+Custom ratios bypass the named strategies:
+
+```bash
+python train.py --strategy "qkv=4,proj=1,fc1=1,fc2=1" --base-rank 8
+```
+
+Data-driven allocation — probe sensitivity, then allocate proportionally at the
+same budget:
+
+```bash
+python experiments/probe_sensitivity.py --probe grad --out runs/sens.json
+# feed runs/sens.json to drlora.budget.sensitivity_allocator
+```
+
+## Strategies
+
+`uniform` (reference) · `qkv_heavy` · `proj_heavy` · `mlp_heavy` ·
+`qkv_only` · `attn_only` · `mlp_only` · `depth_increasing` ·
+`depth_decreasing` · `random_control`. Register your own with
+`drlora.budget.register_allocator`.
+
+## What the results can and cannot say
+
+- A win for `qkv_heavy` over `uniform` at equal parameters supports
+  "QKV is rank-sensitive, not merely necessary".
+- A win for `qkv_only` would be stronger still, but confounds *allocation* with
+  *site coverage* — report it separately from the graded variants.
+- If every strategy lands within the seed spread, the honest conclusion is that
+  allocation does not matter at this budget; re-run at a smaller `--base-rank`,
+  where the budget actually binds, before concluding anything.
+
+## Layout
+
+```
+drlora/budget.py   allocation strategies + exact budget solver (pure numpy)
+drlora/lora.py     per-site-rank LoRALinear, injection, freezing, counting
+drlora/models.py   fixed backbones, site discovery/grouping, cls + dense heads
+drlora/data.py     fixed loaders   drlora/metrics.py  top-1, mIoU
+train.py           one experimental group     experiments/  matrix, probe, analysis
+tests/             budget-control guarantees (run with pytest, no GPU needed)
+```
