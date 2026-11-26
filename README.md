@@ -153,11 +153,34 @@ The distinction worth keeping: MTLoRA's ablation *removed* QKV adapters. That
 shows a site must be adapted. It does not show the site deserves more rank
 once every site is already adapted.
 
-One observation pointing the other way, recorded because it is cheap to test
-and would be a real finding: `qkv_heavy` had the lowest seed variance of the
-five (sd 0.0032 vs `uniform`'s 0.0176). If that survives ~10 seeds and a
-variance test (not a mean test), concentrating rank on QKV buys
-reproducibility rather than accuracy.
+### 10 seeds: qkv_heavy vs uniform
+
+Both arms at 141,312 params, `experiments/variance_test.py`:
+
+| seed | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| qkv_heavy | .710 | .715 | .716 | .711 | .707 | .708 | .702 | .726 | .725 | .716 |
+| uniform | .692 | .722 | .723 | .698 | .718 | .705 | .708 | .716 | .703 | .710 |
+| delta (pp) | +1.8 | -0.7 | -0.7 | +1.3 | -1.1 | +0.3 | -0.6 | +1.0 | +2.2 | +0.6 |
+
+- means: 0.7136 +/- 0.0076 vs 0.7095 +/- 0.0103, delta **+0.41pp**, paired t
+  **p=0.29**, Welch p=0.33, wins 6/10
+- spread: sd ratio 0.74x, Levene **p=0.31**, F-test p=0.39, variance-ratio
+  bootstrap CI **0.15-1.62** (spans 1.0)
+
+**The reproducibility hypothesis died with more data.** At 3 seeds `qkv_heavy`
+looked 5.5x tighter than `uniform`; the ratio fell monotonically to 2.2x,
+1.4x and finally 1.35x as it drew .702, then .726 and .725 -- a textbook
+small-sample variance underestimate. Do not read a variance claim off 3 seeds.
+
+**The mean effect survives as a bound, not a finding.** +0.41pp at p=0.29 with
+6/10 wins is not significance, but it is not nothing either. With
+sd(diff) ~ 1.15pp, detecting +0.41pp at 80% power needs **~60 seeds per arm**
+(~26 h of CPU here, under an hour on a GPU). So the defensible statement is
+"no detectable benefit from QKV-heavy allocation, upper-bounded around +1pp"
+rather than "no benefit" -- and that bound is the useful part: this axis is not
+where the gains are, which is worth knowing before committing a GPU to the
+full matrix.
 
 Where to look for a real effect instead: a task where rank is actually scarce
 -- dense prediction, multi-task, a harder/larger dataset, full-size training
