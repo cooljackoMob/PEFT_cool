@@ -108,37 +108,61 @@ python experiments/probe_sensitivity.py --probe grad --out runs/sens.json
 `depth_decreasing` · `random_control`. Register your own with
 `drlora.budget.register_allocator`.
 
-## First measured result (pilot, read the caveats)
+## Measured result: no allocation effect on this task
 
-Swin-T / CIFAR-100, `--base-rank 2` (141,312 LoRA params, identical for every
-row), 2000 train / 1000 val, 3 epochs, seed 0:
+Swin-T / CIFAR-100 (2000 train / 1000 val), 3 epochs, `head_lr_mult=1`,
+every row at an identical parameter budget. **Three seeds at `--base-rank 2`
+(141,312 LoRA params each):**
 
-| strategy | best top-1 | delta vs uniform |
-|---|---|---|
-| qkv_heavy | 0.7100 | +1.8pp |
-| mlp_heavy | 0.7080 | +1.6pp |
-| **random_control** | **0.7040** | **+1.2pp** |
-| proj_heavy | 0.7010 | +0.9pp |
-| uniform | 0.6920 | — |
+| strategy | s0 | s1 | s2 | mean | sd | paired delta vs uniform | p |
+|---|---|---|---|---|---|---|---|
+| mlp_heavy | .708 | .723 | .723 | 0.7180 | 0.0087 | +1.6 / +0.1 / 0.0 -> **+0.57pp** | 0.39 |
+| random_control | .704 | .721 | .718 | 0.7143 | 0.0091 | +1.2 / -0.1 / -0.5 -> +0.20pp | 0.73 |
+| qkv_heavy | .710 | .715 | .716 | 0.7137 | 0.0032 | +1.8 / -0.7 / -0.7 -> +0.13pp | 0.89 |
+| proj_heavy | .701 | .720 | .716 | 0.7123 | 0.0100 | +0.9 / -0.2 / -0.7 -> +0.00pp | 1.00 |
+| uniform | .692 | .722 | .723 | 0.7123 | 0.0176 | — | — |
 
-**`random_control` is the whole story.** Every reallocation beat `uniform`,
-including the deliberately meaningless one, and `qkv_heavy` leads
-`random_control` by 0.6pp -- a quarter of the spread that changing one
-unrelated hyperparameter (the head LR) produced on the same setup. At one seed
-that is noise, so this pilot does *not* reproduce MTLoRA's QKV ordering under
-decoupled ranks: `proj_heavy` came last of the four reallocations despite
-MTLoRA ranking proj above MLP.
+**MTLoRA's QKV ordering does not transfer to decoupled rank allocation here.**
+No p-value is below 0.39. `qkv_heavy` -- the strategy their ablation predicts
+should win -- places third at p = 0.89, behind a budget-matched *random*
+allocation, and `proj_heavy` places last.
 
-The distinction that matters: MTLoRA's ablation removed QKV adapters
-*entirely*. That says a site must be adapted. It does not say the site
-deserves more rank once every site is already adapted -- which is the question
-this repo asks, and the pilot's answer is "no detectable difference at this
-budget".
+Two things make this a usable null rather than a failed run:
 
-Caveats: one seed, 3 epochs with accuracy still climbing, 20 images per class.
-The budget may also not bind -- rank-8 `uniform` scored 0.7050 against
-rank-2's 0.6920, so 4x the parameters bought 1.3pp, about the size of the
-between-strategy spread. Raw numbers in `results/`.
+1. **`random_control` earns its place in the strategy list.** At one seed every
+   reallocation "beat" uniform by 0.9-1.8pp, random included. All of it came
+   from `uniform`'s seed-0 draw (.692 against .722/.723 after; sd 0.0176, five
+   times the spread between strategy means). Without a nonsense allocation in
+   the table, that reads as a QKV effect.
+2. **The budget never binds, so nothing can exploit it.** Holding the
+   allocation at `uniform` and sweeping the budget 8x:
+
+   | reference rank | LoRA params | top-1 (seed 0) |
+   |---|---|---|
+   | 1 | 70,656 | 0.7100 |
+   | 2 | 141,312 | 0.6920 |
+   | 8 | 565,248 | 0.7050 |
+
+   Flat at ~71% across the range -- the differences are smaller than one seed
+   of noise. Allocation strategy cannot matter where capacity is not scarce,
+   which is the condition this task is in. Going *lower* does not help: rank 1
+   is not binding either (`uniform` .710, `qkv_heavy` .705, `mlp_heavy` .710,
+   `random_control` .694 at 70,656 params).
+
+The distinction worth keeping: MTLoRA's ablation *removed* QKV adapters. That
+shows a site must be adapted. It does not show the site deserves more rank
+once every site is already adapted.
+
+One observation pointing the other way, recorded because it is cheap to test
+and would be a real finding: `qkv_heavy` had the lowest seed variance of the
+five (sd 0.0032 vs `uniform`'s 0.0176). If that survives ~10 seeds and a
+variance test (not a mean test), concentrating rank on QKV buys
+reproducibility rather than accuracy.
+
+Where to look for a real effect instead: a task where rank is actually scarce
+-- dense prediction, multi-task, a harder/larger dataset, full-size training
+rather than a 2000-image subset, or a backbone where the pretrained features
+transfer less well. Raw per-run numbers for all 19 runs: `results/`.
 
 ## What the results can and cannot say
 
