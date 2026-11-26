@@ -1,0 +1,90 @@
+{
+  "setup": {
+    "backbone": "swin_tiny",
+    "dataset": "cifar100 (HF)",
+    "subset": 2000,
+    "val_subset": 1000,
+    "epochs": 3,
+    "base_rank": 2,
+    "head_lr_mult": 1.0,
+    "img_size": 224,
+    "budget_mode": "params"
+  },
+  "runs": {
+    "mlp_heavy-s0": {
+      "best_top1": 0.708,
+      "lora_params": 141312,
+      "per_epoch": [
+        0.515,
+        0.664,
+        0.708
+      ],
+      "ranks_by_group": {
+        "qkv": 14,
+        "proj": 15,
+        "fc1": 33,
+        "fc2": 33
+      }
+    },
+    "random_control-s0": {
+      "best_top1": 0.704,
+      "lora_params": 141312,
+      "per_epoch": [
+        0.522,
+        0.681,
+        0.704
+      ],
+      "ranks_by_group": {
+        "qkv": 25,
+        "proj": 25,
+        "fc1": 25,
+        "fc2": 22
+      }
+    },
+    "qkv_heavy-s0": {
+      "best_top1": 0.71,
+      "lora_params": 141312,
+      "per_epoch": [
+        0.523,
+        0.659,
+        0.71
+      ],
+      "ranks_by_group": {
+        "qkv": 48,
+        "proj": 20,
+        "fc1": 18,
+        "fc2": 18
+      }
+    },
+    "uniform-s0": {
+      "best_top1": 0.692,
+      "lora_params": 141312,
+      "per_epoch": [
+        0.522,
+        0.667,
+        0.692
+      ],
+      "ranks_by_group": {
+        "qkv": 24,
+        "proj": 24,
+        "fc1": 24,
+        "fc2": 24
+      }
+    },
+    "proj_heavy-s0": {
+      "best_top1": 0.701,
+      "lora_params": 141312,
+      "per_epoch": [
+        0.514,
+        0.651,
+        0.701
+      ],
+      "ranks_by_group": {
+        "qkv": 21,
+        "proj": 62,
+        "fc1": 21,
+        "fc2": 21
+      }
+    }
+  }
+}

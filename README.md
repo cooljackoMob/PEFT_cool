@@ -108,6 +108,38 @@ python experiments/probe_sensitivity.py --probe grad --out runs/sens.json
 `depth_decreasing` · `random_control`. Register your own with
 `drlora.budget.register_allocator`.
 
+## First measured result (pilot, read the caveats)
+
+Swin-T / CIFAR-100, `--base-rank 2` (141,312 LoRA params, identical for every
+row), 2000 train / 1000 val, 3 epochs, seed 0:
+
+| strategy | best top-1 | delta vs uniform |
+|---|---|---|
+| qkv_heavy | 0.7100 | +1.8pp |
+| mlp_heavy | 0.7080 | +1.6pp |
+| **random_control** | **0.7040** | **+1.2pp** |
+| proj_heavy | 0.7010 | +0.9pp |
+| uniform | 0.6920 | — |
+
+**`random_control` is the whole story.** Every reallocation beat `uniform`,
+including the deliberately meaningless one, and `qkv_heavy` leads
+`random_control` by 0.6pp -- a quarter of the spread that changing one
+unrelated hyperparameter (the head LR) produced on the same setup. At one seed
+that is noise, so this pilot does *not* reproduce MTLoRA's QKV ordering under
+decoupled ranks: `proj_heavy` came last of the four reallocations despite
+MTLoRA ranking proj above MLP.
+
+The distinction that matters: MTLoRA's ablation removed QKV adapters
+*entirely*. That says a site must be adapted. It does not say the site
+deserves more rank once every site is already adapted -- which is the question
+this repo asks, and the pilot's answer is "no detectable difference at this
+budget".
+
+Caveats: one seed, 3 epochs with accuracy still climbing, 20 images per class.
+The budget may also not bind -- rank-8 `uniform` scored 0.7050 against
+rank-2's 0.6920, so 4x the parameters bought 1.3pp, about the size of the
+between-strategy spread. Raw numbers in `results/`.
+
 ## What the results can and cannot say
 
 - A win for `qkv_heavy` over `uniform` at equal parameters supports
